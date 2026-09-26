@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#08080a" />
+  <title>Healing - Valika</title>
+  <style>
+    :root {
+      --bg-color: #08080a;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background-color: var(--bg-color);
+      touch-action: none;
+    }
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <!-- Fullscreen WebGL Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Portable ES Module loader with CDN fallback -->
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js';
+
+    // Enhanced 3D Taubin Heart Geometry Generator
+    function create3DHeartGeometry(uSegments = 96, vSegments = 96) {
+      const geom = new THREE.BufferGeometry();
+      const positions = [], normals = [], uvs = [], indices = [];
+
+      const depthCoeff = 1.55;
+
+      function F(x, y, z) {
+        const a = x * x + depthCoeff * y * y + z * z - 1.0;
+        return a * a * a - x * x * z * z * z - 0.1125 * y * y * z * z * z;
+      }
+
+      function gradF(x, y, z) {
+        const a = x * x + depthCoeff * y * y + z * z - 1.0;
+        const a2 = a * a, z2 = z * z, z3 = z2 * z;
+        const gx = 6.0 * a2 * x - 2.0 * x * z3;
+        const gy = 6.0 * depthCoeff * a2 * y - 0.225 * y * z3;
+        const gz = 6.0 * a2 * z - 3.0 * x * x * z2 - 0.3375 * y * y * z2;
+        const len = Math.hypot(gx, gy, gz) || 1.0;
+        return { x: gx / len, y: gy / len, z: gz / len };
+      }
+
+      const cx = 0.0, cy = 0.0, cz = 0.2, yCentroidOffset = 0.12;
+
+      for (let j = 0; j <= vSegments; j++) {
+        const v = j / vSegments;
+        const phi = v * Math.PI;
+        const sinPhi = Math.sin(phi), cosPhi = Math.cos(phi);
+
+        for (let i = 0; i <= uSegments; i++) {
+          const u = i / uSegments;
+          const theta = u * 2.0 * Math.PI;
+          const dx = sinPhi * Math.cos(theta), dy = sinPhi * Math.sin(theta), dz = cosPhi;
+
+          let rMin = 0.01, rMax = 2.8;
+          for (let iter = 0; iter < 22; iter++) {
+            const rMid = (rMin + rMax) * 0.5;
+            if (F(cx + rMid * dx, cy + rMid * dy, cz + rMid * dz) < 0.0) rMin = rMid;
+            else rMax = rMid;
+          }
+          const r = (rMin + rMax) * 0.5;
+          const tx = cx + r * dx, ty = cy + r * dy, tz = cz + r * dz;
+          const gn = gradF(tx, ty, tz);
+
+          positions.push(tx, tz - yCentroidOffset, ty);
+          normals.push(gn.x, gn.z, gn.y);
+          uvs.push(u, v);
+        }
+      }
+
+      for (let j = 0; j < vSegments; j++) {
+        for (let i = 0; i < uSegments; i++) {
+          const a = j * (uSegments + 1) + i;
+          const b = a + 1;
+          const c = (j + 1) * (uSegments + 1) + i;
+          const d = c + 1;
+          indices.push(a, c, b);
+          indices.push(b, c, d);
+        }
+      }
+
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geom.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+      geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geom.setIndex(indices);
+      geom.computeBoundingBox();
+      geom.computeBoundingSphere();
+      return geom;
+    }
+
+    // Generate Medical Leukoplast Plaster Texture
+    function createValikaSignTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+
+
+
+      // 2. Leukoplast / Medical Bandage
+      ctx.save();
+      ctx.translate(cx, cy);
+      const angle = -0.11;
+      ctx.rotate(angle);
+
+      const bw = 740, bh = 195, br = bh / 2;
+
+      function drawPill(context, x, y, w, h, r) {
+        context.beginPath();
+        context.moveTo(x + r, y);
+        context.lineTo(x + w - r, y);
+        context.arc(x + w - r, y + r, r, -Math.PI / 2, Math.PI / 2);
+        context.lineTo(x + r, y + h);
+        context.arc(x + r, y + r, r, Math.PI / 2, -Math.PI / 2);
+        context.closePath();
+      }
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.78)';
+      ctx.shadowBlur = 24;
+      ctx.shadowOffsetX = 3;
+      ctx.shadowOffsetY = 12;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      drawPill(ctx, -bw / 2, -bh / 2, bw, bh, br);
+      ctx.fill();
+      ctx.restore();
+
+      const tapeGrad = ctx.createLinearGradient(0, -bh / 2, 0, bh / 2);
+      tapeGrad.addColorStop(0.00, '#eed0b0');
+      tapeGrad.addColorStop(0.15, '#e0b894');
+      tapeGrad.addColorStop(0.50, '#cca078');
+      tapeGrad.addColorStop(0.85, '#b98c66');
+      tapeGrad.addColorStop(1.00, '#a57954');
+      ctx.fillStyle = tapeGrad;
+      drawPill(ctx, -bw / 2, -bh / 2, bw, bh, br);
+      ctx.fill();
+
+      ctx.save();
+      ctx.clip();
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 1;
+      for (let y = -bh / 2; y <= bh / 2; y += 4) {
+        ctx.beginPath();
+        ctx.moveTo(-bw / 2, y);
+        ctx.lineTo(bw / 2, y);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.05)';
+      for (let y = -bh / 2 + 2; y <= bh / 2; y += 4) {
+        ctx.beginPath();
+        ctx.moveTo(-bw / 2, y);
+        ctx.lineTo(bw / 2, y);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+      for (let x = -bw / 2; x <= bw / 2; x += 4) {
+        ctx.beginPath();
+        ctx.moveTo(x, -bh / 2);
+        ctx.lineTo(x, bh / 2);
+        ctx.stroke();
+      }
+
+      const padW = 340;
+      const dotSpacingX = 22, dotSpacingY = 18, dotRadius = 2.2;
+      function drawPores(startX, endX) {
+        for (let x = startX; x <= endX; x += dotSpacingX) {
+          for (let y = -bh / 2 + 24; y <= bh / 2 - 24; y += dotSpacingY) {
+            ctx.fillStyle = 'rgba(65, 40, 25, 0.45)';
+            ctx.beginPath();
+            ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.beginPath();
+            ctx.arc(x, y + 0.8, dotRadius * 0.75, 0, Math.PI);
+            ctx.fill();
+          }
+        }
+      }
+      drawPores(-bw / 2 + 50, -padW / 2 - 20);
+      drawPores(padW / 2 + 20, bw / 2 - 50);
+      ctx.restore();
+
+      ctx.strokeStyle = 'rgba(145, 100, 70, 0.4)';
+      ctx.lineWidth = 2.5;
+      drawPill(ctx, -bw / 2, -bh / 2, bw, bh, br);
+      ctx.stroke();
+
+      // 3. Central Absorbent Gauze Pad
+      const pw = 340, ph = 158, pr = 12;
+      function drawPad(context, x, y, w, h, r) {
+        context.beginPath();
+        context.moveTo(x + r, y);
+        context.lineTo(x + w - r, y);
+        context.quadraticCurveTo(x + w, y, x + w, y + r);
+        context.lineTo(x + w, y + h - r);
+        context.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        context.lineTo(x + r, y + h);
+        context.quadraticCurveTo(x, y + h, x, y + h - r);
+        context.lineTo(x, y + r);
+        context.quadraticCurveTo(x, y, x + r, y);
+        context.closePath();
+      }
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(60, 35, 20, 0.35)';
+      ctx.shadowBlur = 10;
+      ctx.shadowOffsetY = 4;
+      ctx.fillStyle = '#f6efe6';
+      drawPad(ctx, -pw / 2, -ph / 2, pw, ph, pr);
+      ctx.fill();
+      ctx.restore();
+
+      const padGrad = ctx.createLinearGradient(0, -ph / 2, 0, ph / 2);
+      padGrad.addColorStop(0.00, '#faf6ef');
+      padGrad.addColorStop(0.30, '#f2ece0');
+      padGrad.addColorStop(0.70, '#e8ded0');
+      padGrad.addColorStop(1.00, '#ded1be');
+      ctx.fillStyle = padGrad;
+      drawPad(ctx, -pw / 2, -ph / 2, pw, ph, pr);
+      ctx.fill();
+
+      ctx.save();
+      drawPad(ctx, -pw / 2, -ph / 2, pw, ph, pr);
+      ctx.clip();
+      ctx.strokeStyle = 'rgba(175, 155, 135, 0.28)';
+      ctx.lineWidth = 1;
+      const meshSpacing = 8;
+      for (let x = -pw / 2; x <= pw / 2; x += meshSpacing) {
+        ctx.beginPath();
+        ctx.moveTo(x, -ph / 2);
+        ctx.lineTo(x, ph / 2);
+        ctx.stroke();
+      }
+      for (let y = -ph / 2; y <= ph / 2; y += meshSpacing) {
+        ctx.beginPath();
+        ctx.moveTo(-pw / 2, y);
+        ctx.lineTo(pw / 2, y);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(150, 130, 110, 0.35)';
+      ctx.lineWidth = 2;
+      drawPad(ctx, -pw / 2, -ph / 2, pw, ph, pr);
+      ctx.stroke();
+      ctx.restore();
+
+      // 4. Black Marker Text: "VALIKA"
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = '900 84px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+      ctx.letterSpacing = '10px';
+      ctx.shadowColor = 'rgba(15, 18, 26, 0.55)';
+      ctx.shadowBlur = 4;
+      ctx.fillStyle = '#14161f';
+      ctx.fillText('VALIKA', 0, 1);
+      ctx.fillStyle = '#11131a';
+      ctx.fillText('VALIKA', 0, 0);
+      ctx.restore();
+
+      ctx.restore();
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = true;
+      return texture;
+    }
+
+    const PLASMA_GLSL_COMMON = `
+      float evaluateBigPlasmaField(vec2 p, float t) {
+        vec2 c1 = vec2(0.85 * sin(t * 0.32), 0.65 * cos(t * 0.38));
+        vec2 c2 = vec2(0.75 * cos(t * 0.28 + 2.0), 0.70 * sin(t * 0.34 + 1.4));
+        vec2 c3 = vec2(0.90 * sin(t * 0.42 + 3.8), 0.80 * cos(t * 0.45 + 2.7));
+        vec2 c4 = vec2(0.60 * cos(t * 0.50 + 4.9), 0.85 * sin(t * 0.48 + 4.2));
+
+        float d1 = length(p - c1);
+        float d2 = length(p - c2);
+        float d3 = length(p - c3);
+        float d4 = length(p - c4);
+
+        float wave1 = 0.5 + 0.5 * sin(d1 * 3.6 - t * 1.3);
+        float wave2 = 0.5 + 0.5 * cos(d2 * 4.4 + t * 1.1);
+        float wave3 = 0.5 + 0.5 * sin(d3 * 5.2 - t * 1.6);
+        float wave4 = 0.5 + 0.5 * cos(d4 * 6.0 + t * 1.4);
+
+        float blob1 = smoothstep(1.9, 0.1, d1);
+        float blob2 = smoothstep(1.7, 0.15, d2);
+        float blob3 = smoothstep(1.5, 0.2, d3);
+
+        float acc = wave1 * 0.32 + wave2 * 0.28 + wave3 * 0.22 + wave4 * 0.18 + blob1 * 0.22 + blob2 * 0.18 + blob3 * 0.14;
+        return acc * 0.68;
+      }
+
+      float posterize(float val, float levels) {
+        val = clamp(val, 0.0, 1.0);
+        float scaled = val * (levels - 1.0);
+        float base = floor(scaled);
+        float frac = fract(scaled);
+        float band = base + smoothstep(0.40, 0.60, frac);
+        return band / (levels - 1.0);
+      }
+
+      vec3 getBillboardPlasma(vec2 uv, float t, float levels, float contrast, float brightness, float dotDensity) {
+        vec2 rotUv = vec2(uv.x - uv.y, uv.x + uv.y) * 0.70710678;
+        vec2 gridCoord = rotUv * dotDensity;
+        vec2 cellId = floor(gridCoord);
+        vec2 cellFract = fract(gridCoord) - 0.5;
+        
+        vec2 cellCenterRot = (cellId + 0.5) / dotDensity;
+        vec2 cellCenterUv = vec2(cellCenterRot.x + cellCenterRot.y, -cellCenterRot.x + cellCenterRot.y) * 0.70710678;
+        
+        float rawPlasma = evaluateBigPlasmaField(cellCenterUv, t);
+        float vividPlasma = clamp((rawPlasma - 0.46) * contrast + 0.5 + brightness, 0.0, 1.0);
+        float postVal = posterize(vividPlasma, levels);
+        
+        float dotRadius = clamp(postVal * 0.66, 0.03, 0.68);
+        float dist = length(cellFract);
+        
+        float aa = fwidth(dist);
+        if (aa < 0.001) aa = 0.035;
+        float dotMask = smoothstep(dotRadius + aa * 1.2, dotRadius - aa * 1.2, dist);
+        
+        vec3 bgSubstrate = vec3(0.035, 0.038, 0.045);
+        float gridLine = smoothstep(0.48, 0.50, max(abs(cellFract.x), abs(cellFract.y)));
+        bgSubstrate += vec3(0.015, 0.018, 0.022) * gridLine;
+        
+        vec3 dotColor;
+        if (postVal < 0.3) {
+          dotColor = mix(vec3(0.20, 0.22, 0.26), vec3(0.46, 0.48, 0.54), postVal / 0.3);
+        } else if (postVal < 0.7) {
+          dotColor = mix(vec3(0.46, 0.48, 0.54), vec3(0.82, 0.85, 0.90), (postVal - 0.3) / 0.4);
+        } else {
+          dotColor = mix(vec3(0.82, 0.85, 0.90), vec3(1.00, 1.00, 1.00), (postVal - 0.7) / 0.3);
+        }
+        
+        return mix(bgSubstrate, dotColor, dotMask);
+      }
+    `;
+
+    const config = {
+      yRotationSpeed: 1.2,
+      yRotationDirection: 1,
+      easeAmount: 0.10,
+      easeSpeed: 1.4,
+      posterizeLevels: 7.0,
+      dotDensity: 22.0,
+      reflectionStrength: 0.90,
+      shininess: 95.0,
+      contrast: 1.35,
+      brightness: -0.02,
+      keyLightPos: new THREE.Vector3(3.5, 4.5, 5.0),
+      fillLightPos: new THREE.Vector3(-3.5, -2.5, 3.5),
+    };
+
+    const state = {
+      time: 0,
+      heartbeatPulse: 0,
+      isDragging: false,
+      pointerDownTime: 0,
+      pointerDownPos: { x: 0, y: 0 },
+      targetRotation: { x: 0.04, y: 0.0 },
+      currentRotation: { x: 0.04, y: 0.0 },
+      rotVelocity: { x: 0, y: 0 },
+      cameraDistance: 5.2,
+      initialPinchDistance: null,
+      initialCameraDist: 5.2,
+      isPaused: false
+    };
+
+    const container = document.getElementById('canvas-container');
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.0));
+    renderer.autoClear = false;
+    container.appendChild(renderer.domElement);
+
+    const bgScene = new THREE.Scene();
+    const bgCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const bgQuadGeometry = new THREE.PlaneGeometry(2, 2);
+    const bgMaterial = new THREE.ShaderMaterial({
+      vertexShader: `
+        varying vec2 vUv;
+        void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
+      `,
+      fragmentShader: `
+        precision highp float;
+        varying vec2 vUv;
+        uniform float uTime;
+        uniform vec2 uResolution;
+        uniform float uPosterizeLevels;
+        uniform float uContrast;
+        uniform float uBrightness;
+        uniform float uDotDensity;
+        ${PLASMA_GLSL_COMMON}
+        void main() {
+          vec2 st = (gl_FragCoord.xy - 0.5 * uResolution.xy) / min(uResolution.x, uResolution.y);
+          vec3 col = getBillboardPlasma(st, uTime, uPosterizeLevels, uContrast, uBrightness, uDotDensity);
+          float dist = length(st);
+          float vignette = smoothstep(1.5, 0.45, dist);
+          col *= (0.80 + 0.20 * vignette);
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+      uniforms: {
+        uTime: { value: 0.0 },
+        uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+        uPosterizeLevels: { value: config.posterizeLevels },
+        uContrast: { value: config.contrast },
+        uBrightness: { value: config.brightness },
+        uDotDensity: { value: config.dotDensity },
+      },
+      depthWrite: false,
+      depthTest: false,
+    });
+    bgScene.add(new THREE.Mesh(bgQuadGeometry, bgMaterial));
+
+    const mainScene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 50.0);
+    camera.position.set(0, 0, state.cameraDistance);
+
+    const heartGeometry = create3DHeartGeometry(96, 96);
+    const valikaSignTexture = createValikaSignTexture();
+
+    const heartMaterial = new THREE.ShaderMaterial({
+      vertexShader: `
+        varying vec3 vViewPosition;
+        varying vec3 vNormal;
+        varying vec3 vObjectPosition;
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          vObjectPosition = position;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          vViewPosition = mvPosition.xyz;
+          vNormal = normalize(normalMatrix * normal);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        precision highp float;
+        varying vec3 vViewPosition;
+        varying vec3 vNormal;
+        varying vec3 vObjectPosition;
+        varying vec2 vUv;
+        uniform float uTime;
+        uniform vec2 uResolution;
+        uniform float uPosterizeLevels;
+        uniform float uContrast;
+        uniform float uBrightness;
+        uniform float uDotDensity;
+        uniform float uReflectionStrength;
+        uniform float uShininess;
+        uniform vec3 uKeyLightPos;
+        uniform vec3 uFillLightPos;
+        uniform sampler2D uSignTexture;
+        ${PLASMA_GLSL_COMMON}
+        void main() {
+          vec3 N = normalize(vNormal);
+          vec3 V = normalize(-vViewPosition);
+          if (dot(N, V) < 0.0) N = -N;
+          vec3 R = reflect(-V, N);
+          float zBg = -5.0;
+          float rz = min(R.z, -0.05);
+          float t = (zBg - vViewPosition.z) / rz;
+          vec2 planeHit = (vViewPosition.xy + R.xy * t) * 0.28;
+          vec2 sphereHit = vec2(atan(R.x, -R.z) / 3.14159265, R.y * 0.75);
+          float blendFactor = smoothstep(0.05, -0.25, R.z);
+          vec2 reflUv = mix(sphereHit, planeHit, blendFactor);
+          vec3 reflectedPlasma = getBillboardPlasma(reflUv, uTime, uPosterizeLevels, uContrast, uBrightness, uDotDensity);
+          vec3 rubyDark    = vec3(0.24, 0.008, 0.025);
+          vec3 crimsonBase = vec3(0.85, 0.025, 0.075);
+          vec3 scarletGlow = vec3(1.00, 0.120, 0.200);
+          vec3 L1 = normalize(uKeyLightPos);
+          float NdotL1 = dot(N, L1);
+          float wrapL1 = pow(max(NdotL1 * 0.5 + 0.5, 0.0), 1.6);
+          vec3 diffuse = mix(rubyDark, crimsonBase, wrapL1);
+          vec3 L2 = normalize(uFillLightPos);
+          float NdotL2 = max(dot(N, L2), 0.0);
+          diffuse += scarletGlow * (NdotL2 * 0.22);
+          float rim = pow(1.0 - max(dot(N, V), 0.0), 2.5);
+          diffuse += vec3(0.55, 0.02, 0.08) * rim * 0.6;
+          float F0 = 0.28;
+          float NdotV = max(dot(N, V), 0.0);
+          float fresnel = F0 + (1.0 - F0) * pow(1.0 - NdotV, 4.0);
+          vec3 surfaceColor = diffuse + reflectedPlasma * fresnel * uReflectionStrength;
+          vec3 H1 = normalize(L1 + V);
+          float NdotH1 = max(dot(N, H1), 0.0);
+          float spec1 = pow(NdotH1, uShininess) * 1.8;
+          float softSpec = pow(NdotH1, uShininess * 0.25) * 0.35;
+          vec3 H2 = normalize(L2 + V);
+          float spec2 = pow(max(dot(N, H2), 0.0), uShininess * 0.5) * 0.45;
+          vec3 specularColor = vec3(1.0, 0.97, 0.97) * (spec1 + softSpec) + vec3(1.0, 0.88, 0.88) * spec2;
+          surfaceColor += specularColor;
+
+          // Leukoplast plaster "VALIKA" on wound
+          float signW = 1.45;
+          float signH = 0.725;
+          float signCenterY = -0.03;
+          vec2 signUv = vec2(
+            (vObjectPosition.x / signW) + 0.5,
+            ((vObjectPosition.y - signCenterY) / signH) + 0.5
+          );
+          if (vObjectPosition.z > 0.05 && signUv.x >= 0.0 && signUv.x <= 1.0 && signUv.y >= 0.0 && signUv.y <= 1.0) {
+            vec4 signTex = texture2D(uSignTexture, signUv);
+            if (signTex.a > 0.0) {
+              vec3 litPlaster = signTex.rgb * (wrapL1 * 0.75 + 0.32);
+              float clothSheen = pow(max(dot(N, H1), 0.0), 10.0) * 0.12;
+              litPlaster += vec3(clothSheen);
+              surfaceColor = mix(surfaceColor, litPlaster, signTex.a);
+            }
+          }
+
+          surfaceColor = pow(surfaceColor, vec3(0.95));
+          gl_FragColor = vec4(surfaceColor, 1.0);
+        }
+      `,
+      uniforms: {
+        uTime: { value: 0.0 },
+        uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+        uPosterizeLevels: { value: config.posterizeLevels },
+        uContrast: { value: config.contrast },
+        uBrightness: { value: config.brightness },
+        uDotDensity: { value: config.dotDensity },
+        uReflectionStrength: { value: config.reflectionStrength },
+        uShininess: { value: config.shininess },
+        uKeyLightPos: { value: config.keyLightPos },
+        uFillLightPos: { value: config.fillLightPos },
+        uSignTexture: { value: valikaSignTexture },
+      },
+      side: THREE.DoubleSide,
+    });
+
+    const pivotGroup = new THREE.Group();
+    mainScene.add(pivotGroup);
+    const heartMesh = new THREE.Mesh(heartGeometry, heartMaterial);
+    pivotGroup.add(heartMesh);
+    const BASE_HEART_SCALE = 1.35;
+    heartMesh.scale.setScalar(BASE_HEART_SCALE);
+
+    function triggerHeartbeat() {
+      state.heartbeatPulse = 1.0;
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate([15, 25, 15]); } catch (_) {}
+      }
+    }
+
+    let previousPointerPos = { x: 0, y: 0 };
+    window.addEventListener('pointerdown', (e) => {
+      state.isDragging = true;
+      state.pointerDownTime = performance.now();
+      state.pointerDownPos = { x: e.clientX, y: e.clientY };
+      previousPointerPos = { x: e.clientX, y: e.clientY };
+      state.rotVelocity = { x: 0, y: 0 };
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      if (!state.isDragging) return;
+      const deltaX = e.clientX - previousPointerPos.x;
+      const deltaY = e.clientY - previousPointerPos.y;
+      previousPointerPos = { x: e.clientX, y: e.clientY };
+      const speed = 0.005;
+      state.rotVelocity.y = deltaX * speed;
+      state.rotVelocity.x = deltaY * speed;
+      state.targetRotation.y += deltaX * speed;
+      state.targetRotation.x += deltaY * speed;
+      state.targetRotation.x = Math.max(-Math.PI * 0.38, Math.min(Math.PI * 0.38, state.targetRotation.x));
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      if (!state.isDragging) return;
+      state.isDragging = false;
+      const duration = performance.now() - state.pointerDownTime;
+      const dist = Math.hypot(e.clientX - state.pointerDownPos.x, e.clientY - state.pointerDownPos.y);
+      if (duration < 300 && dist < 12) triggerHeartbeat();
+    });
+
+    window.addEventListener('pointercancel', () => { state.isDragging = false; });
+
+    window.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2) {
+        state.initialPinchDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        state.initialCameraDist = state.cameraDistance;
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 2 && state.initialPinchDistance) {
+        const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+        const scale = state.initialPinchDistance / dist;
+        state.cameraDistance = Math.max(3.2, Math.min(8.5, state.initialCameraDist * scale));
+        camera.position.z = state.cameraDistance;
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', (e) => {
+      if (e.touches.length < 2) state.initialPinchDistance = null;
+    }, { passive: true });
+
+    window.addEventListener('wheel', (e) => {
+      state.cameraDistance = Math.max(3.2, Math.min(8.5, state.cameraDistance + e.deltaY * 0.003));
+      camera.position.z = state.cameraDistance;
+    }, { passive: true });
+
+    function onResize() {
+      const width = window.innerWidth, height = window.innerHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.0));
+      const res = new THREE.Vector2(width, height);
+      bgMaterial.uniforms.uResolution.value.copy(res);
+      heartMaterial.uniforms.uResolution.value.copy(res);
+      if (width < 600) camera.position.z = Math.max(state.cameraDistance, 5.8);
+      else camera.position.z = state.cameraDistance;
+    }
+
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', () => { setTimeout(onResize, 150); });
+    onResize();
+
+    document.addEventListener('visibilitychange', () => {
+      state.isPaused = document.visibilityState === 'hidden';
+    });
+
+    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      if (state.isPaused) return;
+
+      const delta = Math.min(clock.getDelta(), 0.1);
+      state.time += delta;
+
+      bgMaterial.uniforms.uTime.value = state.time;
+      heartMaterial.uniforms.uTime.value = state.time;
+
+      // Straight upright rotation around Y axis
+      heartMesh.rotation.x = 0;
+      heartMesh.rotation.z = 0;
+      heartMesh.rotation.y += delta * config.yRotationSpeed * config.yRotationDirection;
+
+      const easeY = Math.sin(state.time * config.easeSpeed) * config.easeAmount;
+      heartMesh.position.y = easeY;
+
+      if (state.heartbeatPulse > 0.001) state.heartbeatPulse *= Math.pow(0.08, delta);
+      else state.heartbeatPulse = 0.0;
+
+      const pulseScale = 1.0 + state.heartbeatPulse * 0.05 * Math.sin(state.time * 20.0);
+      heartMesh.scale.setScalar(BASE_HEART_SCALE * pulseScale);
+
+      if (!state.isDragging) {
+        state.rotVelocity.x *= 0.92;
+        state.rotVelocity.y *= 0.92;
+        state.targetRotation.x += state.rotVelocity.x;
+        state.targetRotation.y += state.rotVelocity.y;
+        const ambientX = Math.sin(state.time * 0.7) * 0.02;
+        state.currentRotation.x += (state.targetRotation.x + ambientX - state.currentRotation.x) * 0.08;
+        state.currentRotation.y += (state.targetRotation.y - state.currentRotation.y) * 0.08;
+      } else {
+        state.currentRotation.x += (state.targetRotation.x - state.currentRotation.x) * 0.2;
+        state.currentRotation.y += (state.targetRotation.y - state.currentRotation.y) * 0.2;
+      }
+
+      pivotGroup.rotation.x = state.currentRotation.x;
+      pivotGroup.rotation.y = state.currentRotation.y;
+
+      renderer.clear();
+      renderer.render(bgScene, bgCamera);
+      renderer.render(mainScene, camera);
+    }
+    animate();
+  </script>
+</body>
+</html>
